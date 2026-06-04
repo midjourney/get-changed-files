@@ -6,22 +6,39 @@
 
 "use strict";
 
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -29,175 +46,173 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(2186));
 const github_1 = __nccwpck_require__(5438);
 const minimatch_1 = __importDefault(__nccwpck_require__(3973));
-function run() {
-    var _a, _b, _c, _d;
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            // Create GitHub client with the API token.
-            const client = new github_1.GitHub(core.getInput('token', { required: true }));
-            const format = core.getInput('format', { required: true });
-            const filter = core.getMultilineInput('filter', { required: true }) || '*';
-            // Ensure that the format parameter is set properly.
-            if (format !== 'space-delimited' && format !== 'csv' && format !== 'json') {
-                core.setFailed(`Format must be one of 'string-delimited', 'csv', or 'json', got '${format}'.`);
-            }
-            // Debug log the payload.
-            core.debug(`Payload keys: ${Object.keys(github_1.context.payload)}`);
-            // Get event name.
-            const eventName = github_1.context.eventName;
-            // Define the base and head commits to be extracted from the payload.
-            let base;
-            let head;
-            switch (eventName) {
-                case 'pull_request_target':
-                case 'pull_request':
-                    base = (_b = (_a = github_1.context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.base) === null || _b === void 0 ? void 0 : _b.sha;
-                    head = (_d = (_c = github_1.context.payload.pull_request) === null || _c === void 0 ? void 0 : _c.head) === null || _d === void 0 ? void 0 : _d.sha;
-                    break;
-                case 'push':
-                    base = github_1.context.payload.before;
-                    head = github_1.context.payload.after;
-                    break;
-                default:
-                    core.setFailed(`This action only supports pull requests and pushes, ${github_1.context.eventName} events are not supported. ` +
-                        "Please submit an issue on this action's GitHub repo if you believe this in correct.");
-            }
-            // Log the base and head commits
-            core.info(`Base commit: ${base}`);
-            core.info(`Head commit: ${head}`);
-            // Ensure that the base and head properties are set on the payload.
-            if (!base || !head) {
-                core.setFailed(`The base and head commits are missing from the payload for this ${github_1.context.eventName} event. ` +
-                    "Please submit an issue on this action's GitHub repo.");
-                // To satisfy TypeScript, even though this is unreachable.
-                base = '';
-                head = '';
-            }
-            // Use GitHub's compare two commits API.
-            // https://developer.github.com/v3/repos/commits/#compare-two-commits
-            const response = yield client.repos.compareCommits({
-                base,
-                head,
-                owner: github_1.context.repo.owner,
-                repo: github_1.context.repo.repo
-            });
-            // Ensure that the request was successful.
-            if (response.status !== 200) {
-                core.setFailed(`The GitHub API for comparing the base and head commits for this ${github_1.context.eventName} event returned ${response.status}, expected 200. ` +
-                    "Please submit an issue on this action's GitHub repo.");
-            }
-            const files = response.data.files.filter(file => {
-                let match = false;
-                for (const item of filter) {
-                    const pattern = item;
-                    core.debug(`Test ${file.filename} against ${pattern}`);
-                    core.debug(`current match value: ${match}`);
-                    if (pattern.startsWith('!')) {
-                        match = match && minimatch_1.default(file.filename, pattern, { matchBase: true, dot: true });
-                    }
-                    else {
-                        match = match || minimatch_1.default(file.filename, pattern, { matchBase: true, dot: true });
-                    }
-                    core.debug(`match: ${match}`);
+async function run() {
+    try {
+        // Create GitHub client with the API token.
+        const client = new github_1.GitHub(core.getInput('token', { required: true }));
+        const format = core.getInput('format', { required: true });
+        const filter = core.getMultilineInput('filter', { required: true }) || '*';
+        // Ensure that the format parameter is set properly.
+        if (format !== 'space-delimited' && format !== 'csv' && format !== 'json') {
+            core.setFailed(`Format must be one of 'string-delimited', 'csv', or 'json', got '${format}'.`);
+        }
+        // Debug log the payload.
+        core.debug(`Payload keys: ${Object.keys(github_1.context.payload)}`);
+        // Get event name.
+        const eventName = github_1.context.eventName;
+        // Define the base and head commits to be extracted from the payload.
+        let base;
+        let head;
+        switch (eventName) {
+            case 'pull_request_target':
+            case 'pull_request':
+                base = github_1.context.payload.pull_request?.base?.sha;
+                head = github_1.context.payload.pull_request?.head?.sha;
+                break;
+            case 'push':
+                base = github_1.context.payload.before;
+                head = github_1.context.payload.after;
+                break;
+            default:
+                core.setFailed(`This action only supports pull requests and pushes, ${github_1.context.eventName} events are not supported. ` +
+                    "Please submit an issue on this action's GitHub repo if you believe this in correct.");
+        }
+        // Log the base and head commits
+        core.info(`Base commit: ${base}`);
+        core.info(`Head commit: ${head}`);
+        // Ensure that the base and head properties are set on the payload.
+        if (!base || !head) {
+            core.setFailed(`The base and head commits are missing from the payload for this ${github_1.context.eventName} event. ` +
+                "Please submit an issue on this action's GitHub repo.");
+            // To satisfy TypeScript, even though this is unreachable.
+            base = '';
+            head = '';
+        }
+        // Use GitHub's compare two commits API.
+        // https://developer.github.com/v3/repos/commits/#compare-two-commits
+        const response = await client.repos.compareCommits({
+            base,
+            head,
+            owner: github_1.context.repo.owner,
+            repo: github_1.context.repo.repo
+        });
+        // Ensure that the request was successful.
+        if (response.status !== 200) {
+            core.setFailed(`The GitHub API for comparing the base and head commits for this ${github_1.context.eventName} event returned ${response.status}, expected 200. ` +
+                "Please submit an issue on this action's GitHub repo.");
+        }
+        const files = response.data.files.filter(file => {
+            let match = false;
+            for (const item of filter) {
+                const pattern = item;
+                core.debug(`Test ${file.filename} against ${pattern}`);
+                core.debug(`current match value: ${match}`);
+                if (pattern.startsWith('!')) {
+                    match = match && (0, minimatch_1.default)(file.filename, pattern, { matchBase: true, dot: true });
                 }
-                return match;
-            });
-            const all = [], added = [], modified = [], removed = [], renamed = [], addedModified = [], addedModifiedRenamed = [];
-            for (const file of files) {
-                const filename = file.filename;
-                // If we're using the 'space-delimited' format and any of the filenames have a space in them,
-                // then fail the step.
-                if (format === 'space-delimited' && filename.includes(' ')) {
-                    core.setFailed(`One of your files includes a space. Consider using a different output format or removing spaces from your filenames. ` +
-                        "Please submit an issue on this action's GitHub repo.");
+                else {
+                    match = match || (0, minimatch_1.default)(file.filename, pattern, { matchBase: true, dot: true });
                 }
-                all.push(filename);
-                switch (file.status) {
-                    case 'added':
-                        added.push(filename);
-                        addedModified.push(filename);
-                        addedModifiedRenamed.push(filename);
-                        break;
-                    case 'modified':
+                core.debug(`match: ${match}`);
+            }
+            return match;
+        });
+        const all = [], added = [], modified = [], removed = [], renamed = [], addedModified = [], addedModifiedRenamed = [];
+        for (const file of files) {
+            const filename = file.filename;
+            // If we're using the 'space-delimited' format and any of the filenames have a space in them,
+            // then fail the step.
+            if (format === 'space-delimited' && filename.includes(' ')) {
+                core.setFailed(`One of your files includes a space. Consider using a different output format or removing spaces from your filenames. ` +
+                    "Please submit an issue on this action's GitHub repo.");
+            }
+            all.push(filename);
+            switch (file.status) {
+                case 'added':
+                    added.push(filename);
+                    addedModified.push(filename);
+                    addedModifiedRenamed.push(filename);
+                    break;
+                case 'modified':
+                    modified.push(filename);
+                    addedModified.push(filename);
+                    addedModifiedRenamed.push(filename);
+                    break;
+                case 'removed':
+                    removed.push(filename);
+                    break;
+                case 'renamed':
+                    renamed.push(filename);
+                    addedModifiedRenamed.push(filename);
+                    if (file.patch) {
+                        // modified renamed files include a patch field
                         modified.push(filename);
                         addedModified.push(filename);
-                        addedModifiedRenamed.push(filename);
-                        break;
-                    case 'removed':
-                        removed.push(filename);
-                        break;
-                    case 'renamed':
-                        renamed.push(filename);
-                        addedModifiedRenamed.push(filename);
-                        if (file.patch) {
-                            // modified renamed files include a patch field
-                            modified.push(filename);
-                            addedModified.push(filename);
-                        }
-                        break;
-                    default:
-                        core.setFailed(`One of your files includes an unsupported file status '${file.status}', expected 'added', 'modified', 'removed', or 'renamed'.`);
-                }
-            }
-            // Format the arrays of changed files.
-            let allFormatted, addedFormatted, modifiedFormatted, removedFormatted, renamedFormatted, addedModifiedFormatted, addedModifiedRenamedFormatted;
-            switch (format) {
-                case 'space-delimited':
-                    // If any of the filenames have a space in them, then fail the step.
-                    for (const file of all) {
-                        if (file.includes(' '))
-                            core.setFailed(`One of your files includes a space. Consider using a different output format or removing spaces from your filenames.`);
                     }
-                    allFormatted = all.join(' ');
-                    addedFormatted = added.join(' ');
-                    modifiedFormatted = modified.join(' ');
-                    removedFormatted = removed.join(' ');
-                    renamedFormatted = renamed.join(' ');
-                    addedModifiedFormatted = addedModified.join(' ');
-                    addedModifiedRenamedFormatted = addedModifiedRenamed.join(' ');
                     break;
-                case 'csv':
-                    allFormatted = all.join(',');
-                    addedFormatted = added.join(',');
-                    modifiedFormatted = modified.join(',');
-                    removedFormatted = removed.join(',');
-                    renamedFormatted = renamed.join(',');
-                    addedModifiedFormatted = addedModified.join(',');
-                    addedModifiedRenamedFormatted = addedModifiedRenamed.join(',');
-                    break;
-                case 'json':
-                    allFormatted = JSON.stringify(all);
-                    addedFormatted = JSON.stringify(added);
-                    modifiedFormatted = JSON.stringify(modified);
-                    removedFormatted = JSON.stringify(removed);
-                    renamedFormatted = JSON.stringify(renamed);
-                    addedModifiedFormatted = JSON.stringify(addedModified);
-                    addedModifiedRenamedFormatted = JSON.stringify(addedModifiedRenamed);
-                    break;
+                default:
+                    core.setFailed(`One of your files includes an unsupported file status '${file.status}', expected 'added', 'modified', 'removed', or 'renamed'.`);
             }
-            // Log the output values.
-            core.info(`All: ${allFormatted}`);
-            core.info(`Added: ${addedFormatted}`);
-            core.info(`Modified: ${modifiedFormatted}`);
-            core.info(`Removed: ${removedFormatted}`);
-            core.info(`Renamed: ${renamedFormatted}`);
-            core.info(`Added or modified: ${addedModifiedFormatted}`);
-            core.info(`Added, modified or renamed: ${addedModifiedRenamedFormatted}`);
-            // Set step output context.
-            core.setOutput('all', allFormatted);
-            core.setOutput('added', addedFormatted);
-            core.setOutput('modified', modifiedFormatted);
-            core.setOutput('removed', removedFormatted);
-            core.setOutput('renamed', renamedFormatted);
-            core.setOutput('added_modified', addedModifiedFormatted);
-            core.setOutput('added_modified_renamed', addedModifiedRenamedFormatted);
-            // For backwards-compatibility
-            core.setOutput('deleted', removedFormatted);
         }
-        catch (error) {
+        // Format the arrays of changed files.
+        let allFormatted, addedFormatted, modifiedFormatted, removedFormatted, renamedFormatted, addedModifiedFormatted, addedModifiedRenamedFormatted;
+        switch (format) {
+            case 'space-delimited':
+                // If any of the filenames have a space in them, then fail the step.
+                for (const file of all) {
+                    if (file.includes(' '))
+                        core.setFailed(`One of your files includes a space. Consider using a different output format or removing spaces from your filenames.`);
+                }
+                allFormatted = all.join(' ');
+                addedFormatted = added.join(' ');
+                modifiedFormatted = modified.join(' ');
+                removedFormatted = removed.join(' ');
+                renamedFormatted = renamed.join(' ');
+                addedModifiedFormatted = addedModified.join(' ');
+                addedModifiedRenamedFormatted = addedModifiedRenamed.join(' ');
+                break;
+            case 'csv':
+                allFormatted = all.join(',');
+                addedFormatted = added.join(',');
+                modifiedFormatted = modified.join(',');
+                removedFormatted = removed.join(',');
+                renamedFormatted = renamed.join(',');
+                addedModifiedFormatted = addedModified.join(',');
+                addedModifiedRenamedFormatted = addedModifiedRenamed.join(',');
+                break;
+            case 'json':
+                allFormatted = JSON.stringify(all);
+                addedFormatted = JSON.stringify(added);
+                modifiedFormatted = JSON.stringify(modified);
+                removedFormatted = JSON.stringify(removed);
+                renamedFormatted = JSON.stringify(renamed);
+                addedModifiedFormatted = JSON.stringify(addedModified);
+                addedModifiedRenamedFormatted = JSON.stringify(addedModifiedRenamed);
+                break;
+        }
+        // Log the output values.
+        core.info(`All: ${allFormatted}`);
+        core.info(`Added: ${addedFormatted}`);
+        core.info(`Modified: ${modifiedFormatted}`);
+        core.info(`Removed: ${removedFormatted}`);
+        core.info(`Renamed: ${renamedFormatted}`);
+        core.info(`Added or modified: ${addedModifiedFormatted}`);
+        core.info(`Added, modified or renamed: ${addedModifiedRenamedFormatted}`);
+        // Set step output context.
+        core.setOutput('all', allFormatted);
+        core.setOutput('added', addedFormatted);
+        core.setOutput('modified', modifiedFormatted);
+        core.setOutput('removed', removedFormatted);
+        core.setOutput('renamed', renamedFormatted);
+        core.setOutput('added_modified', addedModifiedFormatted);
+        core.setOutput('added_modified_renamed', addedModifiedRenamedFormatted);
+        // For backwards-compatibility
+        core.setOutput('deleted', removedFormatted);
+    }
+    catch (error) {
+        if (error instanceof Error)
             core.setFailed(error.message);
-        }
-    });
+    }
 }
 run();
 
