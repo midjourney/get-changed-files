@@ -77,7 +77,21 @@ async function run(): Promise<void> {
       )
     }
 
-    const files = response.data.files.filter(file => {
+    // The compare API returns at most 300 files for a comparison, and offers no
+    // way to page past that: its page/per_page parameters page the commits, and
+    // the file list is only ever returned on the first page. Reaching the cap
+    // therefore means the list is short, with no way to ask for the rest, so
+    // fail rather than let a workflow act on a partial set of changes.
+    const changedFiles = response.data.files || []
+    if (changedFiles.length >= 300) {
+      throw new Error(
+        `The GitHub API reported ${changedFiles.length} changed files, the maximum it returns for a single ` +
+          'comparison, so the list is probably incomplete. Split this change into smaller ones if a complete ' +
+          'list of changed files is needed.'
+      )
+    }
+
+    const files = changedFiles.filter(file => {
       let match = false
       for (const item of filter) {
         const pattern = item
